@@ -2,7 +2,6 @@ import io
 import unittest
 
 from importlib import resources
-from . import data01
 from . import util
 
 
@@ -29,9 +28,7 @@ class PathTests:
             self.assertEqual('Hello, UTF-8 world!\n', text)
 
 
-class PathDiskTests(PathTests, unittest.TestCase):
-    data = data01
-
+class PathDiskTests(PathTests, util.DiskSetup, unittest.TestCase):
     def test_natural_path(self):
         # Guarantee the internal implementation detail that
         # file-system-backed resources do not get the tempdir
