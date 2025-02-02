@@ -249,20 +249,20 @@ def _package_load(filename, package, encoding):
     """
     Load filename relative to package.
     """
-    package = _normalize_module(package, 4)
-    filename = _module_relative_path(package, filename)
-    if (loader := getattr(package, '__loader__', None)) is None:
+    module = _normalize_module(package, 4)
+    path = _module_relative_path(module, filename)
+    if (loader := getattr(module, '__loader__', None)) is None:
         try:
-            loader = package.__spec__.loader
+            loader = module.__spec__.loader
         except AttributeError:
             pass
     if hasattr(loader, 'get_data'):
-        file_contents = loader.get_data(filename)
+        file_contents = loader.get_data(path)
         file_contents = file_contents.decode(encoding)
         # get_data() opens files as 'rb', so one must do the equivalent
         # conversion as universal newlines would do.
-        return _newline_convert(file_contents), filename
-    return _fs_load(filename, package=None, encoding=encoding)
+        return _newline_convert(file_contents), path
+    return _fs_load(path, package=None, encoding=encoding)
 
 
 def _fs_load(filename, package, encoding):
