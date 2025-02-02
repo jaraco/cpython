@@ -239,23 +239,44 @@ def _newline_convert(data):
     # The IO module provides a handy decoder for universal newline conversion
     return IncrementalNewlineDecoder(None, True).decode(data, True)
 
+
 def _load_testfile(filename, package, module_relative, encoding):
-    if module_relative:
-        package = _normalize_module(package, 3)
-        filename = _module_relative_path(package, filename)
-        if (loader := getattr(package, '__loader__', None)) is None:
-            try:
-                loader = package.__spec__.loader
-            except AttributeError:
-                pass
-        if hasattr(loader, 'get_data'):
-            file_contents = loader.get_data(filename)
-            file_contents = file_contents.decode(encoding)
-            # get_data() opens files as 'rb', so one must do the equivalent
-            # conversion as universal newlines would do.
-            return _newline_convert(file_contents), filename
+    _loader = _package_load if module_relative else _fs_load
+    return _loader(filename, package, encoding)
+
+
+def _package_load(filename, package, encoding):
+    """
+    Load filename relative to package.
+    """
+    package = _normalize_module(package, 4)
+    filename = _module_relative_path(package, filename)
+    if (loader := getattr(package, '__loader__', None)) is None:
+        try:
+            loader = package.__spec__.loader
+        except AttributeError:
+            pass
+    if hasattr(loader, 'get_data'):
+        file_contents = loader.get_data(filename)
+        file_contents = file_contents.decode(encoding)
+        # get_data() opens files as 'rb', so one must do the equivalent
+        # conversion as universal newlines would do.
+        return _newline_convert(file_contents), filename
+    return _fs_load(filename, package=None, encoding=encoding)
+
+
+def _fs_load(filename, package, encoding):
+    """
+    Load filename from the filesystem.
+    """
+    if package:
+        raise ValueError(
+            "Package may only be specified for module-relative paths.",
+        )
+
     with open(filename, encoding=encoding) as f:
         return f.read(), filename
+
 
 def _indent(s, indent=4):
     """
@@ -2165,10 +2186,6 @@ def testfile(filename, module_relative=True, name=None, package=None,
     """
     global master
 
-    if package and not module_relative:
-        raise ValueError("Package may only be specified for module-"
-                         "relative paths.")
-
     # Relativize the path
     text, filename = _load_testfile(filename, package, module_relative,
                                     encoding or "utf-8")
@@ -2543,10 +2560,6 @@ def DocFileTest(path, module_relative=True, package=None,
         globs = {}
     else:
         globs = globs.copy()
-
-    if package and not module_relative:
-        raise ValueError("Package may only be specified for module-"
-                         "relative paths.")
 
     # Relativize the path.
     doc, path = _load_testfile(path, package, module_relative,
