@@ -94,6 +94,7 @@ __all__ = [
 
 import __future__
 import difflib
+import importlib.resources
 import inspect
 import linecache
 import os
@@ -102,7 +103,7 @@ import re
 import sys
 import traceback
 import unittest
-from io import StringIO, IncrementalNewlineDecoder
+from io import StringIO
 from collections import namedtuple
 import _colorize  # Used in doctests
 from _colorize import ANSIColors, can_colorize
@@ -235,10 +236,6 @@ def _normalize_module(module, depth=2):
     else:
         raise TypeError("Expected a module, string, or None")
 
-def _newline_convert(data):
-    # The IO module provides a handy decoder for universal newline conversion
-    return IncrementalNewlineDecoder(None, True).decode(data, True)
-
 
 def _load_testfile(filename, package, module_relative, encoding):
     _loader = _package_load if module_relative else _fs_load
@@ -251,18 +248,12 @@ def _package_load(filename, package, encoding):
     """
     module = _normalize_module(package, 4)
     path = _module_relative_path(module, filename)
-    if (loader := getattr(module, '__loader__', None)) is None:
-        try:
-            loader = module.__spec__.loader
-        except AttributeError:
-            pass
-    if hasattr(loader, 'get_data'):
-        file_contents = loader.get_data(path)
-        file_contents = file_contents.decode(encoding)
-        # get_data() opens files as 'rb', so one must do the equivalent
-        # conversion as universal newlines would do.
-        return _newline_convert(file_contents), path
-    return _fs_load(path, package=None, encoding=encoding)
+    try:
+        return importlib.resources.read_text(module, path, encoding=encoding), path
+    except AttributeError:
+        # importlib.resources raises AttributeError when module.__spec__ is None
+        # fallback to file system loader
+        return _fs_load(path, package=None, encoding=encoding)
 
 
 def _fs_load(filename, package, encoding):
